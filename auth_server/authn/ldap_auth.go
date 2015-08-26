@@ -20,6 +20,9 @@ import (
 	"github.com/go-ldap/ldap"
 	"crypto/tls"
 	"fmt"
+	"github.com/syndtr/goleveldb/leveldb/errors"
+	"sync"
+	"github.com/golang/glog"
 )
 
 type LdapAuthConfig struct {
@@ -32,11 +35,13 @@ type LdapAuthConfig struct {
 
 type ldapAuth struct {
 	conn *ldap.Conn
+	config *LdapAuthConfig
+	lock *sync.Mutex
 }
 
 func NewLdapAuth(config *LdapAuthConfig) (*ldapAuth, error) {
 	conn, err := config.connect()
-	sua := &ldapAuth{conn: conn}
+	sua := &ldapAuth{conn: conn, config: config, lock: &sync.Mutex{}}
 	if err != nil {
 		return nil, err
 	}
@@ -64,12 +69,29 @@ func (sua *LdapAuthConfig) connect() (*ldap.Conn, error) {
 
 func (sua *ldapAuth) Authenticate(user string, password PasswordString) error {
 
-	err := sua.conn.Bind(user, string(password))
-	if err != nil {
-		return err
+	for retries := 0; retries < 3; retries++ {
+		err := sua.conn.Bind(user + sua.config.Suffix, string([]byte(password)))
+		if err != nil {
+			ldapErr := err.(*ldap.Error)
+			if ldapErr.ResultCode == 200 {
+				conn, conErr := sua.config.connect()
+				if conErr != nil {
+					glog.Warningln(conErr)
+				} else {
+					sua.lock.Lock()
+					sua.conn = conn
+					sua.lock.Unlock()
+				}
+			} else {
+				return err
+			}
+		} else {
+			return nil
+		}
 	}
 
-	return nil
+	return errors.New("Failed to reconnect after 3 retries")
+
 }
 
 func (sua *ldapAuth) Stop() {

@@ -43,6 +43,7 @@ ldap:
   "port": 636
   "tls": true
   "insecure": false # whether to ignore certificates
+  "max_retries": 3
 
 # Google authentication.
 # ==! NB: DO NOT ENTER YOUR GOOGLE PASSWORD AT "docker login". IT WILL NOT WORK.

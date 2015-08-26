@@ -58,6 +58,7 @@ func NewAuthServer(c *Config) (*AuthServer, error) {
 	as := &AuthServer{config: c}
 	if c.Users != nil {
 		as.authenticators = append(as.authenticators, authn.NewStaticUserAuth(c.Users))
+		glog.V(2).Infof("set up static auth")
 	}
 	if c.GoogleAuth != nil {
 		ga, err := authn.NewGoogleAuth(c.GoogleAuth)
@@ -66,6 +67,7 @@ func NewAuthServer(c *Config) (*AuthServer, error) {
 		}
 		as.authenticators = append(as.authenticators, ga)
 		as.ga = ga
+		glog.V(2).Infof("set up ga auth")
 	}
 	if c.Ldap != nil {
 		ldap, err := authn.NewLdapAuth(c.Ldap)
@@ -73,6 +75,7 @@ func NewAuthServer(c *Config) (*AuthServer, error) {
 			return nil, err
 		}
 		as.authenticators = append(as.authenticators, ldap)
+		glog.V(2).Infof("set up ldap auth")
 	}
 	return as, nil
 }
@@ -106,6 +109,7 @@ func (as *AuthServer) ParseRequest(req *http.Request) (*AuthRequest, error) {
 }
 
 func (as *AuthServer) Authenticate(ar *AuthRequest) error {
+	glog.V(2).Infof("authing with", len(as.authenticators), "authenticators")
 	for i, a := range as.authenticators {
 		err := a.Authenticate(ar.Account, ar.Password)
 		glog.V(2).Infof("auth %d %s -> %s", i, ar.Account, err)
